@@ -1,0 +1,9 @@
+Package: com.ahmad.passconnect
+Name: PassConnect
+Depends: mobilesubstrate
+Version: 0.0.1
+Architecture: iphoneos-arm
+Description: "Cisco AnyConnect" now remembers password, as well as username 
+Maintainer: Ahmad
+Author: Ahmad
+Section: Tweaks
