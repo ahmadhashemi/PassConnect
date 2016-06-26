@@ -1,10 +1,14 @@
+
 %hook CredentialPromptsViewController
 
 BOOL isPasswordViewController;
 static NSString *preferencesFilePath = @"/private/var/mobile/Library/Preferences/com.ahmad.passConnect.plist";
 
 -(void)viewWillAppear:(BOOL)animated {
-
+	
+	NSMutableDictionary *preferences = [NSDictionary dictionaryWithContentsOfFile:preferencesFilePath].mutableCopy;
+	if (!preferences) preferences = [[NSMutableDictionary alloc] init];
+	
 	NSDictionary *userPromptDict = MSHookIvar<NSDictionary *>(self, "userPromptDict");
 	NSString *type = userPromptDict[@"PromptEntryArray"][0][@"Name"];
 	
@@ -12,13 +16,9 @@ static NSString *preferencesFilePath = @"/private/var/mobile/Library/Preferences
 		
 		isPasswordViewController = YES;
 		
-		NSDictionary *preferences = [NSDictionary dictionaryWithContentsOfFile:preferencesFilePath];
-		
-		if (preferences) {
-			
+		if (preferences[@"Password"]) {
 			userPromptDict[@"PromptEntryArray"][0][@"Value"] = preferences[@"Password"];
 			MSHookIvar<NSDictionary *>(self, "userPromptDict") = userPromptDict;
-			
 		}
 		
 	}
@@ -33,15 +33,11 @@ static NSString *preferencesFilePath = @"/private/var/mobile/Library/Preferences
 		
 		isPasswordViewController = NO;
 		
-		NSDictionary *preferences = [NSDictionary dictionaryWithContentsOfFile:preferencesFilePath];
-		
-		if (!preferences) {
-			preferences = [[NSDictionary alloc] init];
-		}
+		NSMutableDictionary *preferences = [NSDictionary dictionaryWithContentsOfFile:preferencesFilePath].mutableCopy;
+		if (!preferences) preferences = [[NSMutableDictionary alloc] init];
 		
 		NSString *passwordString = arg1.text;
-		preferences = @{@"Password":passwordString};
-		
+		[preferences setObject:passwordString forKey:@"Password"];
 		[preferences writeToFile:preferencesFilePath atomically:NO];
 		
 	}
@@ -50,4 +46,91 @@ static NSString *preferencesFilePath = @"/private/var/mobile/Library/Preferences
 	
 }
 
+-(void)viewDidAppear:(BOOL)animated {
+
+	NSMutableDictionary *preferences = [NSDictionary dictionaryWithContentsOfFile:preferencesFilePath].mutableCopy;
+	if (!preferences) {
+		preferences = [[NSMutableDictionary alloc] init];
+	}
+
+    NSDictionary *userPromptDict = MSHookIvar<NSDictionary *>(self, "userPromptDict");
+    NSString *value = userPromptDict[@"PromptEntryArray"][0][@"Value"];
+
+    if (![value isEqualToString:@""] && [preferences[@"AutoConnect"] isEqualToString:@"YES"]) {
+    	[self performSelector:@selector(connect)];
+    }
+
+    %orig;
+
+}
+
 %end
+
+%hook HomeViewController
+
+UISwitch *connectSwitch;
+
+-(void)viewDidLoad {
+	
+	%orig;
+	
+	connectSwitch = [[UISwitch alloc] init];
+	[connectSwitch addTarget:self action:@selector(connectSwitchValueChanged:) forControlEvents:UIControlEventValueChanged];
+	
+	NSMutableDictionary *preferences = [NSDictionary dictionaryWithContentsOfFile:preferencesFilePath].mutableCopy;
+	if (!preferences) {
+		preferences = [[NSMutableDictionary alloc] init];
+	}
+	
+	if ([preferences[@"AutoConnect"] isEqualToString:@"YES"]) {
+		[connectSwitch setOn:YES];
+	}
+	
+}
+
+%new(v@:)
+-(void)connectSwitchValueChanged:(UISwitch *)sender {
+	
+	NSMutableDictionary *preferences = [NSDictionary dictionaryWithContentsOfFile:preferencesFilePath].mutableCopy;
+	if (!preferences) {
+		preferences = [[NSMutableDictionary alloc] init];
+	}
+	
+	NSString *switchStatus;
+	
+	if (sender.isOn) {
+		switchStatus = @"YES";
+	} else {
+		switchStatus = @"NO";
+	}
+	
+	[preferences setObject:switchStatus forKey:@"AutoConnect"];
+	[preferences writeToFile:preferencesFilePath atomically:NO];
+	
+}
+
+-(NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+	return 4;
+}
+
+-(UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+	
+	if (indexPath.row == 3) {
+		
+		UITableViewCell *cell = [[UITableViewCell alloc] init];
+		cell.textLabel.text = @"Auto Connect";
+		cell.accessoryView = connectSwitch;
+		
+		return cell;
+		
+	} else {
+		
+		return %orig;
+		
+	}
+	
+}
+
+%end
+
+
